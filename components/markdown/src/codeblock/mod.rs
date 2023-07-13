@@ -117,15 +117,12 @@ impl<'config> CodeBlock<'config> {
         for (i, line) in LinesWithEndings::from(content).enumerate() {
             let one_indexed = i + 1;
             // first do we need to skip that line?
-            let mut skip = false;
+            let mut keep = true;
             for range in &self.hide_lines {
                 if range.contains(&one_indexed) {
-                    skip = true;
+                    keep = false;
                     break;
                 }
-            }
-            if skip {
-                continue;
             }
 
             // Next is it supposed to be higlighted?
@@ -136,35 +133,41 @@ impl<'config> CodeBlock<'config> {
                 }
             }
 
-            let maybe_mark = |buffer: &mut String, s: &str| {
-                if is_higlighted {
-                    buffer.push_str("<mark");
-                    if let Some(ref style) = mark_style {
-                        buffer.push_str(" style=\"");
-                        buffer.push_str(style);
-                        buffer.push_str("\">");
-                    } else {
-                        buffer.push('>')
-                    }
-                    buffer.push_str(s);
-                    buffer.push_str("</mark>");
-                } else {
+            let maybe_push = |buffer: &mut String, s: &str| {
+                if keep {
                     buffer.push_str(s);
                 }
             };
 
+            let maybe_mark = |buffer: &mut String, s: &str| {
+                if is_higlighted {
+                    maybe_push(buffer, "<mark");
+                    if let Some(ref style) = mark_style {
+                        maybe_push(buffer, " style=\"");
+                        maybe_push(buffer, style);
+                        maybe_push(buffer, "\">");
+                    } else {
+                        maybe_push(buffer, ">")
+                    }
+                    maybe_push(buffer, s);
+                    maybe_push(buffer, "</mark>");
+                } else {
+                    maybe_push(buffer, s);
+                }
+            };
+
             if self.line_numbers {
-                buffer.push_str("<tr><td>");
+                maybe_push(&mut buffer, "<tr><td>");
                 let num = format!("{}", self.line_number_start + i);
                 maybe_mark(&mut buffer, &num);
-                buffer.push_str("</td><td>");
+                maybe_push(&mut buffer, "</td><td>");
             }
 
             let highlighted_line = self.highlighter.highlight_line(line);
             maybe_mark(&mut buffer, &highlighted_line);
 
             if self.line_numbers {
-                buffer.push_str("</td></tr>");
+                maybe_push(&mut buffer, "</td></tr>");
             }
         }
 
